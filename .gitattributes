@@ -1,0 +1,4 @@
+# Keep LF line endings in the repo and working tree, regardless of the
+# user's core.autocrlf setting. Files here run inside Linux containers,
+# where CRLF breaks shell scripts and config files.
+* text=auto eol=lf
