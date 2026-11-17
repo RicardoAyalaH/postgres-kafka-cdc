@@ -1,0 +1,17 @@
+# Secrets / local config (commit .env.example instead)
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
