@@ -1,0 +1,25 @@
+name: postgres-kafka-cdc
+
+services:
+  # Source database: the system of record whose changes we capture.
+  source-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${SOURCE_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SOURCE_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SOURCE_POSTGRES_DB}
+    # wal_level=logical makes the WAL decodable into row-level changes,
+    # which is what Debezium's logical replication slot reads.
+    command: ["postgres", "-c", "wal_level=logical"]
+    ports:
+      - "5433:5432"
+    volumes:
+      - source-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  source-db-data:
