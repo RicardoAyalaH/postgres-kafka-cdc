@@ -8,6 +8,7 @@ node_modules/
 dist/
 build/
 *.log
+logs/
 npm-debug.log*
 
 # Editors / OS
