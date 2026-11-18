@@ -21,9 +21,27 @@ services:
       timeout: 5s
       retries: 10
 
+  # Destination database: the consumer applies captured changes here.
+  # Plain Postgres; nothing reads its WAL, so default wal_level is fine.
+  dest-db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${DEST_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${DEST_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${DEST_POSTGRES_DB}
+    ports:
+      - "5434:5432"
+    volumes:
+      - dest-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # Single Kafka node in KRaft mode (acts as both broker and controller; no ZooKeeper).
   kafka:
-    image: apache/kafka:4.1.0
+    image: apache/kafka:4.3.1
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -85,4 +103,5 @@ services:
 
 volumes:
   source-db-data:
+  dest-db-data:
   kafka-data:
