@@ -1,0 +1,14 @@
+{
+  "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+  "plugin.name": "pgoutput",
+  "database.hostname": "source-db",
+  "database.port": "5432",
+  "database.user": "${env:DEBEZIUM_POSTGRES_USER}",
+  "database.password": "${env:DEBEZIUM_POSTGRES_PASSWORD}",
+  "database.dbname": "shop",
+  "topic.prefix": "shop",
+  "table.include.list": "public.orders",
+  "publication.name": "cdc_publication",
+  "publication.autocreate.mode": "disabled",
+  "slot.name": "debezium_orders"
+}
