@@ -11,6 +11,9 @@ services:
       # Used by init/02-debezium.sh to create Debezium's least-privilege role.
       DEBEZIUM_POSTGRES_USER: ${DEBEZIUM_POSTGRES_USER}
       DEBEZIUM_POSTGRES_PASSWORD: ${DEBEZIUM_POSTGRES_PASSWORD}
+      # Used by init/03-monitor.sh to create the read-only role for the slot monitor.
+      MONITOR_POSTGRES_USER: ${MONITOR_POSTGRES_USER}
+      MONITOR_POSTGRES_PASSWORD: ${MONITOR_POSTGRES_PASSWORD}
     # wal_level=logical makes the WAL decodable into row-level changes,
     # which is what Debezium's logical replication slot reads.
     command: ["postgres", "-c", "wal_level=logical"]
