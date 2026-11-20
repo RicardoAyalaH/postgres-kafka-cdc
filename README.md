@@ -213,10 +213,6 @@ These are the ones found so far; more will be added as the project grows.
 - **The generator runs one transaction at a time**, so concurrent-transaction ordering
   hasn't been exercised.
 
-## What I learned
-
-*To be written.*
-
 ## License
 
 [MIT](LICENSE)
