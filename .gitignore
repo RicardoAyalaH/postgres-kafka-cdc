@@ -9,6 +9,9 @@ dist/
 build/
 *.log
 logs/
+
+# Session handoff notes for Claude Code (personal, not part of the project)
+HANDOFF.md
 npm-debug.log*
 
 # Editors / OS
