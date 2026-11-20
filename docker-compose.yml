@@ -103,6 +103,24 @@ services:
       retries: 18
       start_period: 20s
 
+  # Optional web UI for browsing topics, messages, consumer groups and connectors.
+  # Only starts with: docker compose --profile tools up -d
+  # Read-only: it observes the pipeline but cannot produce, delete or reset anything.
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:v1.5.0
+    profiles: ["tools"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_READONLY: "true"
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://connect:8083
+    ports:
+      - "8080:8080"
+
 volumes:
   source-db-data:
   dest-db-data:
