@@ -1,0 +1,23 @@
+{
+  "topic": "shop.public.orders",
+  "partition": 0,
+  "offset": 26,
+  "key": {
+    "schema": {
+      "type": "struct",
+      "fields": [
+        {
+          "type": "int64",
+          "optional": false,
+          "field": "id"
+        }
+      ],
+      "optional": false,
+      "name": "shop.public.orders.Key"
+    },
+    "payload": {
+      "id": 7
+    }
+  },
+  "value": null
+}
