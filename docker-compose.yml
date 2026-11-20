@@ -97,6 +97,13 @@ services:
       CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      # Config provider: lets connector JSON reference ${env:NAME} placeholders,
+      # resolved from this container's environment when the connector starts.
+      # Keeps the Debezium password out of the connector config and the REST API.
+      CONNECT_CONFIG_PROVIDERS: env
+      CONNECT_CONFIG_PROVIDERS_ENV_CLASS: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+      DEBEZIUM_POSTGRES_USER: ${DEBEZIUM_POSTGRES_USER}
+      DEBEZIUM_POSTGRES_PASSWORD: ${DEBEZIUM_POSTGRES_PASSWORD}
     ports:
       - "8083:8083"
     healthcheck:
