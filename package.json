@@ -10,7 +10,8 @@
   },
   "scripts": {
     "generate": "node --env-file=.env src/generator/index.ts",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "slot-monitor": "node --env-file=.env src/slot-monitor/index.ts"
   },
   "dependencies": {
     "pg": "^8.23.1"
