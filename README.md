@@ -27,7 +27,7 @@ Solid lines are built and verified; dashed lines are planned.
 |---|---|
 | Source Postgres with logical replication, `orders` table | Built |
 | Kafka (single node, KRaft mode, no ZooKeeper) | Built |
-| Kafka Connect with the Debezium Postgres connector | Built. Registration is a manual step for now. |
+| Kafka Connect with the Debezium Postgres connector | Built. Registered automatically on `docker compose up`. |
 | Snapshot of existing rows, then live inserts/updates/deletes into Kafka | Verified |
 | Seeded change generator and shared trace file | Built |
 | Replication slot monitor | Built |
@@ -60,27 +60,27 @@ you like. They're only read when the database volumes are first created (see ste
 **2. Start the stack.**
 
 ```sh
-docker compose up -d --wait
+docker compose up -d
 ```
 
-`--wait` returns once every service passes its health check. On a fresh volume, the source database runs the scripts in
-`db/source/init/` once: they create the `orders` table, the Debezium and monitor roles,
-and the publication.
+On a fresh volume, the source database runs the scripts in `db/source/init/` once: they
+create the `orders` table, the Debezium and monitor roles, and the publication.
 
-**3. Register the Debezium connector.** *(Manual for now.)*
+Once Kafka Connect is healthy, the one-shot `connect-register` service registers the
+Debezium connector from `connect/source-orders.json` and exits. It uses
+`PUT /connectors/source-orders/config`, which creates or updates the connector, so it is
+safe on every `up`. (`docker compose up --wait` is not used because Compose treats a
+container that exits on purpose as a failure.)
 
-```sh
-curl -X PUT -H "Content-Type: application/json" \
-  --data @connect/source-orders.json \
-  http://localhost:8083/connectors/source-orders/config
-```
-
-`PUT .../config` creates the connector or updates it, so it is safe to run again. Check
-that the connector and its task are both `RUNNING`:
+**3. Check that the connector is running.** Registration happens after Connect's health
+check passes, so give it a moment, then:
 
 ```sh
 curl http://localhost:8083/connectors/source-orders/status
 ```
+
+Both `connector.state` and `tasks[0].state` should be `RUNNING`. If not, see what the
+registration job said: `docker compose logs connect-register`.
 
 On first start, Debezium creates the replication slot `debezium_orders`, takes a
 snapshot of the rows already in `orders`, then streams new changes.
@@ -121,10 +121,10 @@ It prints the slot's state every 2 seconds and appends it to `logs/trace.jsonl`.
 with Ctrl+C.
 
 **Stop or reset.** `docker compose down` stops everything and keeps the data.
-`docker compose down -v` also deletes the volumes, so the init scripts run again next time.
-After a reset, delete the connector (`curl -X DELETE http://localhost:8083/connectors/source-orders`)
-before registering it again. Its saved position refers to a replication slot that no
-longer exists.
+`docker compose down -v` also deletes all volumes, Kafka's included, so the next `up`
+starts completely fresh. Avoid resetting *only* the source database volume: Kafka Connect
+would keep the connector's saved position, which refers to a replication slot that no
+longer exists (see Known limitations).
 
 ## What's in it
 
@@ -136,6 +136,7 @@ longer exists.
 | `dest-db` | `postgres:17` | 5434 | Where the consumer will apply changes. Plain Postgres. |
 | `kafka` | `apache/kafka:4.3.1` | 29092 | Single broker that also acts as its own KRaft controller. |
 | `connect` | `quay.io/debezium/connect:3.7.1.Final` | 8083 | Kafka Connect runtime with Debezium's connector plugins. Stores its configs, offsets and statuses in Kafka topics, not on disk. |
+| `connect-register` | same image as `connect` | none | One-shot job: sends the connector config to Connect, then exits. Reuses the Connect image because it already includes `curl`. |
 | `kafka-ui` | `ghcr.io/kafbat/kafka-ui:v1.5.0` | 8080 | Optional (`tools` profile). Read-only web UI. |
 
 ### Source database roles
@@ -209,7 +210,6 @@ These are the ones found so far; more will be added as the project grows.
 - **A recreated slot isn't detected.** Debezium's default offset-mismatch strategy
   (`no_validation`) resumes from the stored position without checking it against the slot,
   so changes in between could be skipped silently.
-- **Connector registration is manual** (step 3 above).
 - **The generator runs one transaction at a time**, so concurrent-transaction ordering
   hasn't been exercised.
 

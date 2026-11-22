@@ -116,6 +116,37 @@ services:
       retries: 18
       start_period: 20s
 
+  # One-shot job: registers (or updates) the Debezium connector once Connect is healthy,
+  # then exits. PUT /connectors/<name>/config is idempotent, so it is safe on every `up`.
+  # Reuses the Connect image only because it already ships curl (no extra image to pull).
+  connect-register:
+    image: quay.io/debezium/connect:3.7.1.Final
+    depends_on:
+      connect:
+        condition: service_healthy
+    volumes:
+      - ./connect:/connect:ro
+    # --fail-with-body: exit non-zero on HTTP errors (e.g. a bad config) and print Connect's message.
+    # --retry-all-errors: a freshly started worker can briefly answer 409 while it joins its group.
+    entrypoint:
+      - curl
+      - --silent
+      - --show-error
+      - --fail-with-body
+      - --retry
+      - "10"
+      - --retry-delay
+      - "3"
+      - --retry-all-errors
+      - -X
+      - PUT
+      - -H
+      - "Content-Type: application/json"
+      - --data
+      - "@/connect/source-orders.json"
+      - http://connect:8083/connectors/source-orders/config
+    restart: "no"
+
   # Optional web UI for browsing topics, messages, consumer groups and connectors.
   # Only starts with: docker compose --profile tools up -d
   # Read-only: it observes the pipeline but cannot produce, delete or reset anything.
