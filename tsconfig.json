@@ -1,5 +1,5 @@
 {
-  // Node 26 runs .ts files directly by stripping types; tsc is used only for type checking.
+  // Node 24 runs .ts files directly by stripping types; tsc is used only for type checking.
   "compilerOptions": {
     "target": "es2024",
     "lib": ["es2024"],

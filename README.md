@@ -40,7 +40,10 @@ Solid lines are built and verified; dashed lines are planned.
 ## Prerequisites
 
 - Docker with Docker Compose v2
-- Node.js 26 or newer, for the scripts that run on the host (generator, slot monitor)
+- Node.js 24, for the scripts that run on the host (generator, slot monitor). The version
+  is pinned in `.node-version`, which version managers such as fnm or nvm read. Node 24
+  rather than the newer Node 26 LTS, because the Kafka client used by the consumer ships
+  prebuilt native binaries only up to Node 24 (as of `@confluentinc/kafka-javascript` 1.11.0).
 - `curl`. On Windows PowerShell, type `curl.exe`, because plain `curl` is an alias for
   `Invoke-WebRequest` there. Git Bash works as-is.
 
