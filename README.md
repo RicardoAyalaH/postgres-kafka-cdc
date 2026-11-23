@@ -32,7 +32,7 @@ Solid lines are built and verified; dashed lines are planned.
 | Seeded change generator and shared trace file | Built |
 | Replication slot monitor | Built |
 | Captured Debezium events as test fixtures | Saved in `fixtures/debezium/` |
-| Destination Postgres container | Running; **no schema yet** |
+| Destination schema with per-row LSN guard and soft deletes | Built. Guard checked by hand in SQL; not yet driven by the consumer. |
 | Consumer writing to the destination idempotently | Planned |
 | Latency measurement (p50/p95) | Planned. No numbers yet. |
 | React dashboard | Planned |
@@ -163,10 +163,11 @@ environment-variable config provider when the connector starts.
 |---|---|
 | `connect/source-orders.json` | Debezium connector config: `pgoutput` plugin, `public.orders` only, the pre-created publication, slot `debezium_orders`, topic prefix `shop` (topic `shop.public.orders`). |
 | `db/source/init/` | Source database setup: table and `updated_at` trigger, Debezium role and publication, monitor role. |
+| `db/dest/init/` | Destination schema: the `orders` replica with `source_lsn` and `deleted` columns, and the `orders_live` view that hides deleted rows. |
 | `src/generator/` | Seeded generator of inserts, updates and deletes. The same seed on the same starting data gives the same operations. |
 | `src/slot-monitor/` | Polls `pg_replication_slots` and records lag and retained WAL in bytes. |
 | `src/shared/trace.ts` | Shared trace format: one JSON line per pipeline hop, in `logs/trace.jsonl` (git-ignored). Changes are linked across hops by Postgres transaction id and WAL position (LSN). |
-| `fixtures/debezium/` | Real Debezium messages (snapshot read, create, update, delete, tombstone) for future consumer tests. |
+| `fixtures/debezium/` | Real Debezium messages (snapshot read, create, update, delete, tombstone) used as test inputs. `src/consumer/fixtures.test.ts` checks the format assumptions the consumer relies on. |
 
 ### npm scripts
 
@@ -174,6 +175,7 @@ environment-variable config provider when the connector starts.
 |---|---|
 | `npm run generate -- --count N --seed S --delay-ms D` | Makes N changes to `orders`, one transaction each, and logs each commit to the trace |
 | `npm run slot-monitor -- --interval-ms 2000 --slot debezium_orders` | Polls the replication slot until Ctrl+C |
+| `npm test` | Runs the unit tests (Vitest) |
 | `npm run typecheck` | Type-checks with `tsc`. Node runs the `.ts` files directly by stripping types, so there is no build step. |
 
 ## Design notes
@@ -192,6 +194,14 @@ Short versions for now; fuller explanations will come as the project is finished
   base64-encoded unscaled integer that every consumer would have to decode. As a string
   (`"146.50"`) it stays exact and Postgres accepts it as-is. Rejected: `double`, which is
   lossy for money.
+- **Idempotent writes with a per-row LSN guard.** Each destination row stores the source WAL
+  position (`source_lsn`) of the last change applied to it, and every event is one upsert
+  that only overwrites if the incoming LSN is newer. A redelivered or replayed event
+  changes nothing, whether Kafka redelivered it or Debezium re-sent it after a crash.
+  Deletes are soft (`deleted = true`) so the row keeps its LSN and a replayed older event
+  can't bring it back. Rejected: plain upsert/delete by primary key, which is what generic
+  sink connectors do. It also ends correct after a full in-order replay, but rows briefly
+  go backwards (and deleted rows reappear) while the replay runs.
 - **Own consumer instead of a ready-made sink connector**, because idempotent writes, offset
   commits and tombstone handling are what this project is meant to teach.
 
@@ -215,6 +225,13 @@ These are the ones found so far; more will be added as the project grows.
 - **A recreated slot isn't detected.** Debezium's default offset-mismatch strategy
   (`no_validation`) resumes from the stored position without checking it against the slot,
   so changes in between could be skipped silently.
+- **Deleted rows are never purged** from the destination; they stay as markers
+  (`deleted = true`). A real system would purge markers older than any possible replay.
+- **The LSN guard assumes source LSNs only grow.** If the source database were rebuilt from
+  scratch, its new, lower LSNs would make every event look stale and be skipped. A rebuilt
+  source needs a rebuilt destination (`docker compose down -v` resets both).
+- **The topic has one partition.** That keeps all changes in
+  commit order, but a second consumer in the same group would sit idle.
 - **The generator runs one transaction at a time**, so concurrent-transaction ordering
   hasn't been exercised.
 

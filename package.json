@@ -11,7 +11,8 @@
   "scripts": {
     "generate": "node --env-file=.env src/generator/index.ts",
     "typecheck": "tsc",
-    "slot-monitor": "node --env-file=.env src/slot-monitor/index.ts"
+    "slot-monitor": "node --env-file=.env src/slot-monitor/index.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@confluentinc/kafka-javascript": "^1.11.0",
@@ -20,7 +21,8 @@
   "devDependencies": {
     "@types/node": "^24.19.2",
     "@types/pg": "^8.23.1",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
   },
   "allowScripts": {
     "@confluentinc/kafka-javascript@1.11.0": true
