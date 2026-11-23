@@ -1,7 +1,7 @@
 {
   "topic": "shop.public.orders",
   "partition": 0,
-  "offset": 26,
+  "offset": 14,
   "key": {
     "schema": {
       "type": "struct",
@@ -16,7 +16,7 @@
       "name": "shop.public.orders.Key"
     },
     "payload": {
-      "id": 7
+      "id": 5
     }
   },
   "value": null

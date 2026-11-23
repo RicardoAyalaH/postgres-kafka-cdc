@@ -188,6 +188,10 @@ Short versions for now; fuller explanations will come as the project is finished
   row. That's useful for inspection, at the cost of more WAL. The consumer will not rely on it.
 - **JSON with embedded schemas**, chosen so events are readable while learning. Avro with a
   schema registry was considered and deferred.
+- **`decimal.handling.mode=string`.** Debezium's default (`precise`) sends `numeric` as a
+  base64-encoded unscaled integer that every consumer would have to decode. As a string
+  (`"146.50"`) it stays exact and Postgres accepts it as-is. Rejected: `double`, which is
+  lossy for money.
 - **Own consumer instead of a ready-made sink connector**, because idempotent writes, offset
   commits and tombstone handling are what this project is meant to teach.
 
@@ -201,9 +205,7 @@ These are the ones found so far; more will be added as the project grows.
   default, so a crash can resend up to about a minute of events. The consumer will have to
   be idempotent; that isn't built yet.
 - **Large messages.** Every message carries its full schema. In the saved `create` fixture
-  the schema takes 3,148 bytes and the row data 614 bytes.
-- **`numeric` arrives as base64-encoded bytes** under Debezium's default
-  `decimal.handling.mode=precise`. Consumers must decode it or change that setting.
+  the schema takes 2,912 bytes and the row data 613 bytes (compact JSON).
 - **Snapshot events can't be traced to the transaction that wrote the row.** Their
   `source.txId` is the snapshot's own transaction.
 - **One task per connector.** A Postgres replication slot is a single ordered stream, so the

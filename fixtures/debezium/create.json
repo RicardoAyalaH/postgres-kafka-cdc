@@ -1,7 +1,7 @@
 {
   "topic": "shop.public.orders",
   "partition": 0,
-  "offset": 12,
+  "offset": 9,
   "key": {
     "schema": {
       "type": "struct",
@@ -16,7 +16,7 @@
       "name": "shop.public.orders.Key"
     },
     "payload": {
-      "id": 16
+      "id": 7
     }
   },
   "value": {
@@ -43,14 +43,8 @@
               "field": "status"
             },
             {
-              "type": "bytes",
+              "type": "string",
               "optional": false,
-              "name": "org.apache.kafka.connect.data.Decimal",
-              "version": 1,
-              "parameters": {
-                "scale": "2",
-                "connect.decimal.precision": "10"
-              },
               "field": "amount"
             },
             {
@@ -94,14 +88,8 @@
               "field": "status"
             },
             {
-              "type": "bytes",
+              "type": "string",
               "optional": false,
-              "name": "org.apache.kafka.connect.data.Decimal",
-              "version": 1,
-              "parameters": {
-                "scale": "2",
-                "connect.decimal.precision": "10"
-              },
               "field": "amount"
             },
             {
@@ -272,36 +260,36 @@
     "payload": {
       "before": null,
       "after": {
-        "id": 16,
-        "customer_name": "Felipe Souza",
+        "id": 7,
+        "customer_name": "Hiro Tanaka",
         "status": "pending",
-        "amount": "d3c=",
-        "created_at": "2026-11-20T22:07:26.681514Z",
-        "updated_at": "2026-11-20T22:07:26.681514Z"
+        "amount": "61.44",
+        "created_at": "2026-11-23T06:26:24.556837Z",
+        "updated_at": "2026-11-23T06:26:24.556837Z"
       },
       "source": {
         "version": "3.7.1.Final",
         "connector": "postgresql",
         "name": "shop",
-        "ts_ms": 1795212446691,
+        "ts_ms": 1795415184559,
         "snapshot": "false",
         "db": "shop",
-        "sequence": "[\"26834976\",\"26835080\"]",
-        "ts_us": 1795212446691972,
-        "ts_ns": 1795212446691972000,
+        "sequence": "[\"26820392\",\"26820392\"]",
+        "ts_us": 1795415184559622,
+        "ts_ns": 1795415184559622000,
         "schema": "public",
         "table": "orders",
-        "txId": 805,
-        "lsn": 26835080,
+        "txId": 777,
+        "lsn": 26820392,
         "xmin": null,
         "origin": null,
         "origin_lsn": null
       },
       "transaction": null,
       "op": "c",
-      "ts_ms": 1795212446756,
-      "ts_us": 1795212446756704,
-      "ts_ns": 1795212446756704500
+      "ts_ms": 1795415184724,
+      "ts_us": 1795415184724208,
+      "ts_ns": 1795415184724208000
     }
   }
 }

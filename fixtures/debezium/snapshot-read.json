@@ -1,7 +1,7 @@
 {
   "topic": "shop.public.orders",
   "partition": 0,
-  "offset": 1,
+  "offset": 0,
   "key": {
     "schema": {
       "type": "struct",
@@ -16,7 +16,7 @@
       "name": "shop.public.orders.Key"
     },
     "payload": {
-      "id": 3
+      "id": 2
     }
   },
   "value": {
@@ -43,14 +43,8 @@
               "field": "status"
             },
             {
-              "type": "bytes",
+              "type": "string",
               "optional": false,
-              "name": "org.apache.kafka.connect.data.Decimal",
-              "version": 1,
-              "parameters": {
-                "scale": "2",
-                "connect.decimal.precision": "10"
-              },
               "field": "amount"
             },
             {
@@ -94,14 +88,8 @@
               "field": "status"
             },
             {
-              "type": "bytes",
+              "type": "string",
               "optional": false,
-              "name": "org.apache.kafka.connect.data.Decimal",
-              "version": 1,
-              "parameters": {
-                "scale": "2",
-                "connect.decimal.precision": "10"
-              },
               "field": "amount"
             },
             {
@@ -272,36 +260,36 @@
     "payload": {
       "before": null,
       "after": {
-        "id": 3,
-        "customer_name": "Bilal Khan",
-        "status": "paid",
-        "amount": "AJWz",
-        "created_at": "2026-11-20T04:10:44.325926Z",
-        "updated_at": "2026-11-20T04:10:44.354943Z"
+        "id": 2,
+        "customer_name": "Jonas Berg",
+        "status": "shipped",
+        "amount": "144.14",
+        "created_at": "2026-11-23T06:25:40.516399Z",
+        "updated_at": "2026-11-23T06:25:40.642066Z"
       },
       "source": {
         "version": "3.7.1.Final",
         "connector": "postgresql",
         "name": "shop",
-        "ts_ms": 1795162005418,
-        "snapshot": "true",
+        "ts_ms": 1795415174775,
+        "snapshot": "first",
         "db": "shop",
-        "sequence": "[null,\"26830520\"]",
-        "ts_us": 1795162005418171,
-        "ts_ns": 1795162005418171000,
+        "sequence": "[null,\"26819432\"]",
+        "ts_us": 1795415174775604,
+        "ts_ns": 1795415174775604000,
         "schema": "public",
         "table": "orders",
-        "txId": 800,
-        "lsn": 26830520,
+        "txId": 773,
+        "lsn": 26819432,
         "xmin": null,
         "origin": null,
         "origin_lsn": null
       },
       "transaction": null,
       "op": "r",
-      "ts_ms": 1795162005533,
-      "ts_us": 1795162005533192,
-      "ts_ns": 1795162005533192700
+      "ts_ms": 1795415174959,
+      "ts_us": 1795415174959213,
+      "ts_ns": 1795415174959213600
     }
   }
 }

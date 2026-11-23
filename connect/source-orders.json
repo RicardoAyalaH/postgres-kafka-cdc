@@ -10,5 +10,6 @@
   "table.include.list": "public.orders",
   "publication.name": "cdc_publication",
   "publication.autocreate.mode": "disabled",
-  "slot.name": "debezium_orders"
+  "slot.name": "debezium_orders",
+  "decimal.handling.mode": "string"
 }

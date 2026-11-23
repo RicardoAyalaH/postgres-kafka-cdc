@@ -4,10 +4,14 @@ Real messages read from the `shop.public.orders` topic, not hand-written.
 Used as inputs for unit tests of the consumer's event → SQL mapping.
 
 Captured with Debezium 3.7.1.Final, the `pgoutput` plugin, the JSON converter
-with embedded schemas, `REPLICA IDENTITY FULL`, and the default
-`decimal.handling.mode=precise`. That means `amount` is a base64-encoded,
-big-endian two's-complement unscaled integer with scale 2. Example:
-`"MIw="` → `0x308C` → 12428 → `124.28`.
+with embedded schemas, `REPLICA IDENTITY FULL`, and
+`decimal.handling.mode=string`. That means `amount` (`numeric(10,2)`) arrives
+as a decimal string with its scale kept, e.g. `"146.50"`, which Postgres
+accepts directly for a `numeric` column. (With Debezium's default, `precise`,
+it was a base64-encoded unscaled integer, e.g. `"MIw="` for `124.28`.)
+
+The source table had 6 rows before the connector was registered, so the topic
+starts with 6 snapshot reads (offsets 0–5), followed by live changes.
 
 | File | `op` | What it shows |
 |---|---|---|
