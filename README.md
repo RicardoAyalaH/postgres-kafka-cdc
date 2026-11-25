@@ -32,7 +32,8 @@ Solid lines are built and verified; dashed lines are planned.
 | Seeded change generator and shared trace file | Built |
 | Replication slot monitor | Built |
 | Captured Debezium events as test fixtures | Saved in `fixtures/debezium/` |
-| Destination schema with per-row LSN guard and soft deletes | Built. Guard checked by hand in SQL; not yet driven by the consumer. |
+| Destination schema with per-row LSN guard and soft deletes | Built |
+| Mapping of each Debezium event to one guarded SQL statement | Built. Unit-tested against the fixtures and tested against `dest-db` (replay, out-of-order, delete). Not yet called by a consumer. |
 | Consumer writing to the destination idempotently | Planned |
 | Latency measurement (p50/p95) | Planned. No numbers yet. |
 | React dashboard | Planned |
@@ -166,6 +167,7 @@ environment-variable config provider when the connector starts.
 | `db/dest/init/` | Destination schema: the `orders` replica with `source_lsn` and `deleted` columns, and the `orders_live` view that hides deleted rows. |
 | `src/generator/` | Seeded generator of inserts, updates and deletes. The same seed on the same starting data gives the same operations. |
 | `src/slot-monitor/` | Polls `pg_replication_slots` and records lag and retained WAL in bytes. |
+| `src/consumer/mapping.ts` | Turns one Debezium event into one SQL statement: an LSN-guarded upsert for snapshot reads, inserts and updates, an LSN-guarded soft delete for deletes, nothing for tombstones. Throws on anything else, so the replica never silently diverges. |
 | `src/shared/trace.ts` | Shared trace format: one JSON line per pipeline hop, in `logs/trace.jsonl` (git-ignored). Changes are linked across hops by Postgres transaction id and WAL position (LSN). |
 | `fixtures/debezium/` | Real Debezium messages (snapshot read, create, update, delete, tombstone) used as test inputs. `src/consumer/fixtures.test.ts` checks the format assumptions the consumer relies on. |
 
@@ -175,7 +177,8 @@ environment-variable config provider when the connector starts.
 |---|---|
 | `npm run generate -- --count N --seed S --delay-ms D` | Makes N changes to `orders`, one transaction each, and logs each commit to the trace |
 | `npm run slot-monitor -- --interval-ms 2000 --slot debezium_orders` | Polls the replication slot until Ctrl+C |
-| `npm test` | Runs the unit tests (Vitest) |
+| `npm test` | Runs the unit tests (Vitest). No Docker needed. |
+| `npm run test:db` | Runs the mapped SQL against `dest-db` (needs `docker compose up -d dest-db`). Each test is rolled back. |
 | `npm run typecheck` | Type-checks with `tsc`. Node runs the `.ts` files directly by stripping types, so there is no build step. |
 
 ## Design notes
