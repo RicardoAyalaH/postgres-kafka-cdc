@@ -158,13 +158,24 @@ Debezium is configured not to create one. Debezium's password is not in the conn
 JSON. It's written as `${env:DEBEZIUM_POSTGRES_PASSWORD}` and filled in by Kafka Connect's
 environment-variable config provider when the connector starts.
 
+### Destination database roles
+
+| Role | Can | Used by |
+|---|---|---|
+| owner (`DEST_POSTGRES_USER`) | everything (superuser in the `postgres` image); owns the table and view | init scripts |
+| `cdc_consumer` | `SELECT`, `INSERT`, `UPDATE` on `orders`; `SELECT` on `orders_live`. No `DELETE`, `TRUNCATE` or `CREATE` | consumer, `npm run test:db` |
+
+`SELECT` is required, not just convenient: the LSN guard's `WHERE` clauses read columns.
+The missing `DELETE` makes soft deletes a rule the database enforces: a hard delete fails
+with `permission denied`, and `npm run test:db` checks that it does.
+
 ### Files
 
 | Path | What it is |
 |---|---|
 | `connect/source-orders.json` | Debezium connector config: `pgoutput` plugin, `public.orders` only, the pre-created publication, slot `debezium_orders`, topic prefix `shop` (topic `shop.public.orders`). |
 | `db/source/init/` | Source database setup: table and `updated_at` trigger, Debezium role and publication, monitor role. |
-| `db/dest/init/` | Destination schema: the `orders` replica with `source_lsn` and `deleted` columns, and the `orders_live` view that hides deleted rows. |
+| `db/dest/init/` | Destination schema: the `orders` replica with `source_lsn` and `deleted` columns, and the `orders_live` view that hides deleted rows; the consumer's role. |
 | `src/generator/` | Seeded generator of inserts, updates and deletes. The same seed on the same starting data gives the same operations. |
 | `src/slot-monitor/` | Polls `pg_replication_slots` and records lag and retained WAL in bytes. |
 | `src/consumer/mapping.ts` | Turns one Debezium event into one SQL statement: an LSN-guarded upsert for snapshot reads, inserts and updates, an LSN-guarded soft delete for deletes, nothing for tombstones. Throws on anything else, so the replica never silently diverges. |
@@ -178,7 +189,7 @@ environment-variable config provider when the connector starts.
 | `npm run generate -- --count N --seed S --delay-ms D` | Makes N changes to `orders`, one transaction each, and logs each commit to the trace |
 | `npm run slot-monitor -- --interval-ms 2000 --slot debezium_orders` | Polls the replication slot until Ctrl+C |
 | `npm test` | Runs the unit tests (Vitest). No Docker needed. |
-| `npm run test:db` | Runs the mapped SQL against `dest-db` (needs `docker compose up -d dest-db`). Each test is rolled back. |
+| `npm run test:db` | Runs the mapped SQL against `dest-db` as `cdc_consumer` (needs `docker compose up -d dest-db`). Each test is rolled back. |
 | `npm run typecheck` | Type-checks with `tsc`. Node runs the `.ts` files directly by stripping types, so there is no build step. |
 
 ## Design notes

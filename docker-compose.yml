@@ -37,6 +37,9 @@ services:
       POSTGRES_USER: ${DEST_POSTGRES_USER}
       POSTGRES_PASSWORD: ${DEST_POSTGRES_PASSWORD}
       POSTGRES_DB: ${DEST_POSTGRES_DB}
+      # Used by init/02-consumer.sh to create the consumer's role (no DELETE, no DDL).
+      CONSUMER_POSTGRES_USER: ${CONSUMER_POSTGRES_USER}
+      CONSUMER_POSTGRES_PASSWORD: ${CONSUMER_POSTGRES_PASSWORD}
     ports:
       - "5434:5432"
     volumes:

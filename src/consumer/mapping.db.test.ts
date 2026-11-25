@@ -19,11 +19,12 @@ const variant = (name: string, edit: (p: Payload) => void) => {
 };
 
 process.loadEnvFile(new URL('../../.env', import.meta.url));
+// Connects as the consumer's role, so the tests also prove its privileges are enough.
 const client = new pg.Client({
   host: process.env.DEST_POSTGRES_HOST ?? 'localhost',
   port: Number(process.env.DEST_POSTGRES_PORT ?? 5434),
-  user: process.env.DEST_POSTGRES_USER,
-  password: process.env.DEST_POSTGRES_PASSWORD,
+  user: process.env.CONSUMER_POSTGRES_USER,
+  password: process.env.CONSUMER_POSTGRES_PASSWORD,
   database: process.env.DEST_POSTGRES_DB,
 });
 
@@ -100,5 +101,10 @@ describe('mapped statements against dest-db', () => {
   it('a delete for a row that was never applied changes nothing', async () => {
     expect(await apply(value('delete.json'))).toBe(0);
     expect(await row(5)).toBeUndefined();
+  });
+
+  it('the consumer role cannot hard-delete, so deletes must stay soft', async () => {
+    // 42501 = insufficient_privilege. The error aborts the transaction; afterEach rolls it back.
+    await expect(client.query('DELETE FROM orders WHERE id = 5')).rejects.toMatchObject({ code: '42501' });
   });
 });
