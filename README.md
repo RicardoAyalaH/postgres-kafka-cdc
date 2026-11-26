@@ -188,6 +188,7 @@ with `permission denied`, and `npm run test:db` checks that it does.
 |---|---|
 | `npm run generate -- --count N --seed S --delay-ms D` | Makes N changes to `orders`, one transaction each, and logs each commit to the trace |
 | `npm run slot-monitor -- --interval-ms 2000 --slot debezium_orders` | Polls the replication slot until Ctrl+C |
+| `npm run consumer` | Reads `shop.public.orders` (group `CONSUMER_GROUP_ID`) and applies each change to `dest-db`, committing the offset after each write. Stops on any error without committing; restart it to resume. |
 | `npm test` | Runs the unit tests (Vitest). No Docker needed. |
 | `npm run test:db` | Runs the mapped SQL against `dest-db` as `cdc_consumer` (needs `docker compose up -d dest-db`). Each test is rolled back. |
 | `npm run typecheck` | Type-checks with `tsc`. Node runs the `.ts` files directly by stripping types, so there is no build step. |

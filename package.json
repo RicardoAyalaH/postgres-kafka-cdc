@@ -12,6 +12,7 @@
     "generate": "node --env-file=.env src/generator/index.ts",
     "typecheck": "tsc",
     "slot-monitor": "node --env-file=.env src/slot-monitor/index.ts",
+    "consumer": "node --env-file=.env src/consumer/index.ts",
     "test": "vitest run --exclude \"**/*.db.test.ts\"",
     "test:db": "vitest run src/consumer/mapping.db.test.ts"
   },
