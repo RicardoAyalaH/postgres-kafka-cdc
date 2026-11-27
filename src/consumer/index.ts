@@ -6,8 +6,13 @@
 //
 // Any failure stops the process without committing (see `fail` below); restarting it
 // resumes from the last committed offset.
+//
+// Flags: --crash-after-write  fault injection for the crash test: exits right after the
+//                             first write of this run, before committing its offset.
+import './check-node.ts'; // first: must run before the Kafka client loads its native binary
 import kafka from '@confluentinc/kafka-javascript';
 import pg from 'pg';
+import { createTraceWriter } from '../shared/trace.ts';
 import { mapEvent } from './mapping.ts';
 
 const { Kafka, logLevel } = kafka.KafkaJS;
@@ -26,6 +31,9 @@ const BROKERS = (process.env.KAFKA_BROKERS ?? 'localhost:29092').split(',');
 // Committed offsets are stored per group id. A new group id has none, so it starts from
 // the beginning of the topic (fromBeginning below): a full replay.
 const GROUP_ID = requireEnv('CONSUMER_GROUP_ID');
+const CRASH_AFTER_WRITE = process.argv.includes('--crash-after-write');
+
+const trace = createTraceWriter('consumer');
 
 // ---------- Destination database ----------
 
@@ -66,15 +74,36 @@ const counts = { applied: 0, stale: 0, tombstones: 0 };
 let stopping = false;
 let inFlight: Promise<void> | null = null;
 
-class StoppingError extends Error {
-  override name = 'StoppingError';
-}
+type Message = { offset: string; timestamp: string; value: Buffer | null };
 
-type Message = { offset: string; value: Buffer | null };
+/** Debezium's two timestamps, for tracing only (mapEvent validates what the write needs). */
+function debeziumTimes(value: unknown): { sourceTsMs?: number; debeziumTsMs?: number } {
+  const payload = (value as { payload?: { ts_ms?: number; source?: { ts_ms?: number } } } | null)?.payload;
+  return {
+    sourceTsMs: payload?.source?.ts_ms, // commit time in the source database (from the WAL)
+    debeziumTsMs: payload?.ts_ms,       // when Debezium processed the change
+  };
+}
 
 async function handle(partition: number, message: Message): Promise<void> {
   const value: unknown = message.value === null ? null : JSON.parse(message.value.toString('utf8'));
   const mapped = mapEvent(value);
+  const where = { partition, offset: message.offset };
+
+  // Fields that link this change's entries to the generator's source.commit entry.
+  const ids = mapped.kind === 'apply'
+    ? { table: 'orders', op: mapped.op, key: { id: String(mapped.id) }, txId: String(mapped.txId), lsn: String(mapped.lsn) }
+    : {};
+  trace({
+    hop: 'consumer.received',
+    ...ids,
+    detail: {
+      ...where,
+      tombstone: mapped.kind === 'skip',
+      kafkaTimestampMs: Number(message.timestamp), // record timestamp (CreateTime, set by the producer)
+      ...debeziumTimes(value),
+    },
+  });
 
   let outcome: string;
   if (mapped.kind === 'skip') {
@@ -82,16 +111,27 @@ async function handle(partition: number, message: Message): Promise<void> {
     outcome = 'tombstone, nothing to write';
   } else {
     const { rowCount } = await pool.query(mapped.statement);
+    // 1 row: the change was newer than the row's source_lsn. 0 rows: the guard's WHERE was
+    // false, so this change (or a newer one) had already been applied.
     const applied = rowCount === 1;
     counts[applied ? 'applied' : 'stale']++;
+    trace({ hop: 'dest.applied', ...ids, detail: { ...where, result: applied ? 'applied' : 'stale' } });
     outcome = `${mapped.op} id=${mapped.id} lsn=${mapped.lsn} tx=${mapped.txId} → ` +
       (applied ? 'applied' : 'stale, skipped by LSN guard');
+
+    if (CRASH_AFTER_WRITE) {
+      // Simulated crash in the at-least-once window: written but not committed. A plain
+      // exit skips disconnect(), so the broker also sees a dead member, as in a real crash.
+      console.error(`p${partition} offset ${message.offset}: ${outcome}; --crash-after-write: exiting before commit`);
+      process.exit(1);
+    }
   }
 
   // The committed offset is the next one to read, so offset + 1. BigInt because Kafka
   // offsets are int64 and arrive as strings.
   const next = (BigInt(message.offset) + 1n).toString();
   await consumer.commitOffsets([{ topic: TOPIC, partition, offset: next }]);
+  trace({ hop: 'consumer.committed', ...ids, detail: { ...where, committed: next } });
   console.log(`p${partition} offset ${message.offset}: ${outcome}; committed ${next}`);
 }
 
@@ -101,6 +141,13 @@ async function shutdown(reason: string, exitCode: number): Promise<void> {
   if (stopping) return;
   stopping = true;
   console.log(`consumer: stopping (${reason})`);
+  // Watchdog: if a clean close hangs, exit anyway. Correctness doesn't depend on it (the
+  // committed offset is already right); the cost is that the broker only drops this member
+  // after its session timeout, so the next start waits for the partition.
+  setTimeout(() => {
+    console.error('consumer: shutdown took over 10 s, exiting without a clean disconnect');
+    process.exit(exitCode || 1);
+  }, 10_000).unref();
   // Let the message being processed finish its write and commit (or fail).
   await inFlight?.catch(() => {});
   try {
@@ -116,8 +163,9 @@ async function shutdown(reason: string, exitCode: number): Promise<void> {
 }
 
 /**
- * Stops the process after a failed message. Called from inside eachMessage, so it must
- * not await the shutdown: disconnect() waits for eachMessage to return, which would deadlock.
+ * Stops the process after a failed message: the message is not committed, so the next run
+ * retries it. Called from inside eachMessage, so it must not await the shutdown:
+ * disconnect() waits for eachMessage to return, which would deadlock.
  */
 function fail(offset: string, err: unknown): void {
   console.error(`consumer: failed at offset ${offset}, not committed: ${(err as Error).stack ?? err}`);
@@ -142,16 +190,18 @@ await consumer.subscribe({ topics: [TOPIC] });
 console.log(`consumer: group "${GROUP_ID}" reading ${TOPIC} from ${BROKERS.join(',')} (Ctrl+C to stop)`);
 
 await consumer.run({
+  // Never throws. A throw makes the client queue a seek back to this message, and that
+  // seek can run after disconnect() has started and crash the client ("Assignment can
+  // only be called while connected"), as the dest-db-down test showed. We don't need the
+  // seek: once stopping, nothing more is committed, so the next run resumes from the last
+  // committed offset. (autoCommit is off, so the client never commits on its own.)
   eachMessage: async ({ partition, message }) => {
-    // Throwing makes the client seek back to this message instead of moving on, and
-    // nothing is committed, so the next run starts here.
-    if (stopping) throw new StoppingError('consumer is stopping');
+    if (stopping) return; // not processed and not committed: redelivered next run
     inFlight = handle(partition, message);
     try {
       await inFlight;
     } catch (err) {
       fail(message.offset, err);
-      throw err;
     } finally {
       inFlight = null;
     }

@@ -188,9 +188,9 @@ with `permission denied`, and `npm run test:db` checks that it does.
 |---|---|
 | `npm run generate -- --count N --seed S --delay-ms D` | Makes N changes to `orders`, one transaction each, and logs each commit to the trace |
 | `npm run slot-monitor -- --interval-ms 2000 --slot debezium_orders` | Polls the replication slot until Ctrl+C |
-| `npm run consumer` | Reads `shop.public.orders` (group `CONSUMER_GROUP_ID`) and applies each change to `dest-db`, committing the offset after each write. Stops on any error without committing; restart it to resume. |
+| `npm run consumer` | Reads `shop.public.orders` (group `CONSUMER_GROUP_ID`) and applies each change to `dest-db`, committing the offset after each write. Stops on any error without committing; restart it to resume. Writes `consumer.received`, `dest.applied` (applied or stale) and `consumer.committed` to the trace. `--crash-after-write` is fault injection for the crash test: it exits after the first write, before the commit. |
 | `npm test` | Runs the unit tests (Vitest). No Docker needed. |
-| `npm run test:db` | Runs the mapped SQL against `dest-db` as `cdc_consumer` (needs `docker compose up -d dest-db`). Each test is rolled back. |
+| `npm run test:db` | Runs the mapped SQL against `dest-db` with `cdc_consumer`'s privileges (needs `docker compose up -d dest-db`). Each test empties the table inside a transaction that is rolled back, so the replica's rows are left as they were. |
 | `npm run typecheck` | Type-checks with `tsc`. Node runs the `.ts` files directly by stripping types, so there is no build step. |
 
 ## Design notes
