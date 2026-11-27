@@ -169,6 +169,11 @@ environment-variable config provider when the connector starts.
 The missing `DELETE` makes soft deletes a rule the database enforces: a hard delete fails
 with `permission denied`, and `npm run test:db` checks that it does.
 
+`dest-db` holds two databases with the same schema and the same `cdc_consumer` grants:
+`DEST_POSTGRES_DB` (the replica the consumer writes) and `DEST_TEST_POSTGRES_DB` (always
+empty, for `npm run test:db`). Both come from the same init scripts in `db/dest/init/`, so
+the tests can't drift from the replica's schema or privileges.
+
 ### Files
 
 | Path | What it is |
@@ -190,7 +195,7 @@ with `permission denied`, and `npm run test:db` checks that it does.
 | `npm run slot-monitor -- --interval-ms 2000 --slot debezium_orders` | Polls the replication slot until Ctrl+C |
 | `npm run consumer` | Reads `shop.public.orders` (group `CONSUMER_GROUP_ID`) and applies each change to `dest-db`, committing the offset after each write. Stops on any error without committing; restart it to resume. Writes `consumer.received`, `dest.applied` (applied or stale) and `consumer.committed` to the trace. `--crash-after-write` is fault injection for the crash test: it exits after the first write, before the commit. |
 | `npm test` | Runs the unit tests (Vitest). No Docker needed. |
-| `npm run test:db` | Runs the mapped SQL against `dest-db` with `cdc_consumer`'s privileges (needs `docker compose up -d dest-db`). Each test empties the table inside a transaction that is rolled back, so the replica's rows are left as they were. |
+| `npm run test:db` | Runs the mapped SQL against the test database on `dest-db` (`DEST_TEST_POSTGRES_DB`), connected as `cdc_consumer` (needs `docker compose up -d dest-db`). Each test runs in a transaction that is rolled back, so the database stays empty; the run refuses to start if it isn't, or if it's pointed at the replica. |
 | `npm run typecheck` | Type-checks with `tsc`. Node runs the `.ts` files directly by stripping types, so there is no build step. |
 
 Optional pre-commit hook: `git config core.hooksPath .githooks` makes git run `typecheck` and

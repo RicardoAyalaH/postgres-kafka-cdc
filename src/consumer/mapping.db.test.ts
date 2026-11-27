@@ -1,8 +1,11 @@
-// Runs the statements from mapEvent against the real destination database, to check that
-// Postgres accepts them and that the LSN guard behaves as designed. Needs dest-db running
-// (docker compose up -d dest-db); run with `npm run test:db`. Each test runs in a
-// transaction that starts from an empty table and is rolled back, so the replica's real
-// rows are never changed.
+// Runs the statements from mapEvent against Postgres, to check that it accepts them and
+// that the LSN guard behaves as designed. Uses the test database on dest-db
+// (DEST_TEST_POSTGRES_DB, created by db/dest/init/02-test-db.sh): same schema and grants
+// as the replica, always empty. Needs dest-db running (docker compose up -d dest-db); run
+// with `npm run test:db`.
+//
+// Connects as the consumer's role, so every privilege check is the consumer's own. Each
+// test runs in a transaction that is rolled back, so the database stays empty.
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -20,17 +23,18 @@ const variant = (name: string, edit: (p: Payload) => void) => {
 };
 
 process.loadEnvFile(new URL('../../.env', import.meta.url));
-// Connects as the owner only to empty the table inside each test's transaction (dest-db
-// usually holds the consumer's replica, and the tests need a known starting state). The
-// statements under test then run as the consumer's role: see beforeEach.
+const testDb = process.env.DEST_TEST_POSTGRES_DB;
+// Never the replica: these tests assume an empty table they own.
+if (!testDb || testDb === process.env.DEST_POSTGRES_DB) {
+  throw new Error('DEST_TEST_POSTGRES_DB must name the test database, not the replica (see .env.example)');
+}
 const client = new pg.Client({
   host: process.env.DEST_POSTGRES_HOST ?? 'localhost',
   port: Number(process.env.DEST_POSTGRES_PORT ?? 5434),
-  user: process.env.DEST_POSTGRES_USER,
-  password: process.env.DEST_POSTGRES_PASSWORD,
-  database: process.env.DEST_POSTGRES_DB,
+  user: process.env.CONSUMER_POSTGRES_USER,
+  password: process.env.CONSUMER_POSTGRES_PASSWORD,
+  database: testDb,
 });
-const consumerRole = process.env.CONSUMER_POSTGRES_USER!;
 
 /** Maps and applies one event; returns the number of rows the statement changed. */
 async function apply(event: unknown): Promise<number> {
@@ -48,17 +52,15 @@ async function row(id: number) {
   return rows[0];
 }
 
-beforeAll(() => client.connect());
-afterAll(() => client.end());
-beforeEach(async () => {
-  await client.query('BEGIN');
-  // Rolled back after each test, so the real rows come back untouched. While a test runs,
-  // this uncommitted delete row-locks the table, so a running consumer waits briefly.
-  await client.query('DELETE FROM orders');
-  // From here on, privilege checks are the consumer's own: the tests prove its grants
-  // are enough (and that DELETE is refused). SET LOCAL ends with the transaction.
-  await client.query(`SET LOCAL ROLE ${client.escapeIdentifier(consumerRole)}`);
+beforeAll(async () => {
+  await client.connect();
+  // Every test rolls back, so rows here mean something committed: a test that forgot its
+  // transaction, or a database that isn't the test database.
+  const { rows } = await client.query('SELECT count(*)::int AS n FROM orders');
+  if (rows[0].n !== 0) throw new Error(`expected an empty orders table in ${testDb}, found ${rows[0].n} rows`);
 });
+afterAll(() => client.end());
+beforeEach(() => client.query('BEGIN'));
 afterEach(() => client.query('ROLLBACK'));
 
 describe('mapped statements against dest-db', () => {

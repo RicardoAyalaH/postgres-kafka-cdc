@@ -37,14 +37,17 @@ services:
       POSTGRES_USER: ${DEST_POSTGRES_USER}
       POSTGRES_PASSWORD: ${DEST_POSTGRES_PASSWORD}
       POSTGRES_DB: ${DEST_POSTGRES_DB}
-      # Used by init/02-consumer.sh to create the consumer's role (no DELETE, no DDL).
+      # Used by init/03-consumer.sh to create the consumer's role (no DELETE, no DDL).
       CONSUMER_POSTGRES_USER: ${CONSUMER_POSTGRES_USER}
       CONSUMER_POSTGRES_PASSWORD: ${CONSUMER_POSTGRES_PASSWORD}
+      # Empty database with the same schema and grants, for npm run test:db (init/02-test-db.sh).
+      DEST_TEST_POSTGRES_DB: ${DEST_TEST_POSTGRES_DB}
     ports:
       - "5434:5432"
     volumes:
       - dest-db-data:/var/lib/postgresql/data
-      # Creates the replica schema; runs only when the data volume is empty.
+      # Creates the replica and test schemas and the consumer role; runs only when the
+      # data volume is empty.
       - ./db/dest/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
