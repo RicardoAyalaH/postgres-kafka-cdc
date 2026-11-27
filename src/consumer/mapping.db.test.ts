@@ -1,7 +1,8 @@
 // Runs the statements from mapEvent against the real destination database, to check that
 // Postgres accepts them and that the LSN guard behaves as designed. Needs dest-db running
 // (docker compose up -d dest-db); run with `npm run test:db`. Each test runs in a
-// transaction that is rolled back, so no data is left behind.
+// transaction that starts from an empty table and is rolled back, so the replica's real
+// rows are never changed.
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -19,14 +20,17 @@ const variant = (name: string, edit: (p: Payload) => void) => {
 };
 
 process.loadEnvFile(new URL('../../.env', import.meta.url));
-// Connects as the consumer's role, so the tests also prove its privileges are enough.
+// Connects as the owner only to empty the table inside each test's transaction (dest-db
+// usually holds the consumer's replica, and the tests need a known starting state). The
+// statements under test then run as the consumer's role: see beforeEach.
 const client = new pg.Client({
   host: process.env.DEST_POSTGRES_HOST ?? 'localhost',
   port: Number(process.env.DEST_POSTGRES_PORT ?? 5434),
-  user: process.env.CONSUMER_POSTGRES_USER,
-  password: process.env.CONSUMER_POSTGRES_PASSWORD,
+  user: process.env.DEST_POSTGRES_USER,
+  password: process.env.DEST_POSTGRES_PASSWORD,
   database: process.env.DEST_POSTGRES_DB,
 });
+const consumerRole = process.env.CONSUMER_POSTGRES_USER!;
 
 /** Maps and applies one event; returns the number of rows the statement changed. */
 async function apply(event: unknown): Promise<number> {
@@ -46,7 +50,15 @@ async function row(id: number) {
 
 beforeAll(() => client.connect());
 afterAll(() => client.end());
-beforeEach(() => client.query('BEGIN'));
+beforeEach(async () => {
+  await client.query('BEGIN');
+  // Rolled back after each test, so the real rows come back untouched. While a test runs,
+  // this uncommitted delete row-locks the table, so a running consumer waits briefly.
+  await client.query('DELETE FROM orders');
+  // From here on, privilege checks are the consumer's own: the tests prove its grants
+  // are enough (and that DELETE is refused). SET LOCAL ends with the transaction.
+  await client.query(`SET LOCAL ROLE ${client.escapeIdentifier(consumerRole)}`);
+});
 afterEach(() => client.query('ROLLBACK'));
 
 describe('mapped statements against dest-db', () => {
