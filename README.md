@@ -193,6 +193,10 @@ with `permission denied`, and `npm run test:db` checks that it does.
 | `npm run test:db` | Runs the mapped SQL against `dest-db` with `cdc_consumer`'s privileges (needs `docker compose up -d dest-db`). Each test empties the table inside a transaction that is rolled back, so the replica's rows are left as they were. |
 | `npm run typecheck` | Type-checks with `tsc`. Node runs the `.ts` files directly by stripping types, so there is no build step. |
 
+Optional pre-commit hook: `git config core.hooksPath .githooks` makes git run `typecheck` and
+`npm test` before each commit (`.githooks/pre-commit`). It's per clone and can be skipped with
+`--no-verify`, so it complements CI rather than replacing it.
+
 ## Design notes
 
 Short versions for now; fuller explanations will come as the project is finished.

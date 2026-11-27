@@ -1,0 +1,9 @@
+#!/bin/sh
+# Pre-commit check: type check and unit tests (fast, no Docker). The database tests
+# (npm run test:db) need dest-db running, so they're left to CI and manual runs.
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+# Skip once (e.g. a work-in-progress commit):  git commit --no-verify
+set -e
+npm run --silent typecheck
+npm test --silent
