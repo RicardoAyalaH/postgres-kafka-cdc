@@ -202,6 +202,10 @@ Optional pre-commit hook: `git config core.hooksPath .githooks` makes git run `t
 `npm test` before each commit (`.githooks/pre-commit`). It's per clone and can be skipped with
 `--no-verify`, so it complements CI rather than replacing it.
 
+CI (`.github/workflows/ci.yml`, GitHub Actions) runs the same checks plus `npm run test:db`
+on every pull request and push to `master`. It starts `dest-db` with `docker compose`, so it
+uses the same init scripts as a local run. It doesn't start Kafka, Debezium or the consumer yet.
+
 ## Design notes
 
 Short versions for now; fuller explanations will come as the project is finished.

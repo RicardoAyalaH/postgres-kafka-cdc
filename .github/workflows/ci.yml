@@ -1,0 +1,61 @@
+# Type check, unit tests, and the database tests against dest-db's empty test database.
+# The pipeline itself (Kafka, Debezium, consumer) is not started here yet.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+# Read-only token: the job only reads the repository.
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request cancels the run in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Actions are pinned to commit SHAs (tags can be moved); the comment names the release.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false # nothing is pushed, so don't leave the token in .git/config
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      # Placeholder credentials only (the file is committed); the tests read .env.
+      - name: Create .env from .env.example
+        run: cp .env.example .env
+
+      # Started first so Postgres initializes while npm installs. The same service and init
+      # scripts as a local run (a GitHub service container starts before checkout, so it
+      # couldn't mount db/dest/init).
+      - name: Start dest-db
+        run: docker compose up -d dest-db
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Wait for dest-db
+        run: docker compose up -d --wait dest-db
+
+      - name: Database tests
+        run: npm run test:db
+
+      - name: dest-db logs
+        if: failure()
+        run: docker compose logs dest-db
